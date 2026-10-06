@@ -1,0 +1,7 @@
+# LaTeX build files
+*.aux
+*.log
+*.synctex.gz
+
+# Jupyter
+.ipynb_checkpoints/
