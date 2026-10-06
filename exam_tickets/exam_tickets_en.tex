@@ -1,0 +1,356 @@
+\documentclass[a4paper,12pt]{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[english]{babel}
+\usepackage{amsmath,amssymb}
+\usepackage{geometry}
+\geometry{margin=2cm}
+
+\begin{document}
+\raggedright
+
+%----------------------------------------
+\section*{Exam Ticket 1}
+\textbf{(1) Theory:}
+\begin{itemize}
+  \item Machine learning: definition, key examples of tasks (regression, classification), and types of learning (supervised, unsupervised, reinforcement learning).
+\end{itemize}
+
+\textbf{(2) Calculation/Derivation:}
+\begin{itemize}
+  \item Derive the ordinary least squares (OLS) method from the maximum likelihood principle, assuming Gaussian errors.
+\end{itemize}
+
+\textbf{(3) Programming Practice:}
+\begin{itemize}
+  \item Write Python code to read an input file where each line is a JSON object. Extract several required fields from each object (for example, \texttt{user\_id}, \texttt{item\_id}) and construct a \texttt{pandas.DataFrame}.
+\end{itemize}
+
+\noindent\rule{\textwidth}{0.4pt}
+\newpage
+
+%----------------------------------------
+\section*{Exam Ticket 2}
+\textbf{(1) Theory:}
+\begin{itemize}
+  \item The sample--feature matrix and its role in ML. Regression and classification tasks: common loss functions (MSE, MAE, logloss, etc.). How do loss functions differ from evaluation metrics?
+\end{itemize}
+
+\textbf{(2) Calculation/Derivation:}
+\begin{itemize}
+  \item Derive the maximum likelihood estimate of the parameter of a Bernoulli random variable.
+\end{itemize}
+
+\textbf{(3) Programming Practice:}
+\begin{itemize}
+  \item Read a CSV dataset in which one of the features is categorical (for example, \texttt{color}). Apply one-hot encoding to this feature using \texttt{pandas.get\_dummies} or \texttt{sklearn.preprocessing.OneHotEncoder}.
+\end{itemize}
+
+\noindent\rule{\textwidth}{0.4pt}
+\newpage
+
+%----------------------------------------
+\section*{Exam Ticket 3}
+\textbf{(1) Theory:}
+\begin{itemize}
+  \item Working with categorical features: ordered and unordered features, encoding methods (one-hot encoding, count-based encoding, the hashing trick). When is count-based encoding preferable?
+\end{itemize}
+
+\textbf{(2) Calculation/Derivation:}
+\begin{itemize}
+  \item Give the analytical formula for the coefficients of linear regression without regularization. Briefly derive it by minimizing $\|Xw - y\|^2$.
+\end{itemize}
+
+\textbf{(3) Programming Practice:}
+\begin{itemize}
+  \item Using Python/NumPy, generate a synthetic dataset with a few dozen points, fit a simple linear regression model using OLS (with the analytical formula or \texttt{np.linalg.solve}), print the estimated weights, and visualize the result.
+\end{itemize}
+
+\noindent\rule{\textwidth}{0.4pt}
+\newpage
+
+%----------------------------------------
+\section*{Exam Ticket 4}
+\textbf{(1) Theory:}
+\begin{itemize}
+  \item Linear models: L1 and L2 regularization and their properties (sparse weights with L1, weight shrinkage with L2). Can a purely linear model capture a nonlinear relationship?
+\end{itemize}
+
+\textbf{(2) Calculation/Derivation:}
+\begin{itemize}
+  \item Give the analytical expression for linear regression with L2 regularization (Ridge).
+\end{itemize}
+
+\textbf{(3) Programming Practice:}
+\begin{itemize}
+  \item Implement a Python function to compute the ROC curve and ROC AUC from given true labels $y_{\text{true}}$ and predicted probabilities $y_{\text{pred\_proba}}$. Compare the results with \texttt{sklearn.metrics.roc\_curve} and \texttt{roc\_auc\_score}.
+\end{itemize}
+
+\noindent\rule{\textwidth}{0.4pt}
+\newpage
+
+%----------------------------------------
+\section*{Exam Ticket 5}
+\textbf{(1) Theory:}
+\begin{itemize}
+  \item Binary classification metrics: precision, recall, TPR, FPR, ROC, ROC AUC, and F1 score. How is a classifier's decision threshold selected?
+\end{itemize}
+
+\textbf{(2) Calculation/Derivation:}
+\begin{itemize}
+  \item Write the formulas for precision, recall, and F1. Describe how to construct the ROC curve and compute ROC AUC.
+\end{itemize}
+
+\textbf{(3) Programming Practice:}
+\begin{itemize}
+  \item Write a function that accepts a list of text strings (or several strings), extracts a vocabulary of unique words, and returns this set as an ``alphabet'' for further processing, such as text classification.
+\end{itemize}
+
+\noindent\rule{\textwidth}{0.4pt}
+\newpage
+
+%----------------------------------------
+\section*{Exam Ticket 6}
+\textbf{(1) Theory:}
+\begin{itemize}
+  \item Decision trees: the construction procedure (greedy splitting) and split quality criteria --- entropy, variance, and Gini impurity. How is the prediction at a regression leaf selected?
+\end{itemize}
+
+\textbf{(2) Calculation/Derivation:}
+\begin{itemize}
+  \item What does ``greedy'' mean when choosing a split? Write the formula for Gini impurity and briefly explain its meaning.
+\end{itemize}
+
+\textbf{(3) Programming Practice:}
+\begin{itemize}
+  \item Use scikit-learn to train a decision tree, for example on the Iris dataset. Print its depth and feature importances, visualize the tree using \texttt{export\_graphviz} or \texttt{plot\_tree}, and show the result.
+\end{itemize}
+
+\noindent\rule{\textwidth}{0.4pt}
+\newpage
+
+%----------------------------------------
+\section*{Exam Ticket 7}
+\textbf{(1) Theory:}
+\begin{itemize}
+  \item Bagging and Random Forest: what is the idea behind bagging? How is a random forest constructed? How do hyperparameters (the number of trees, their depth, and \texttt{max\_features}) affect the bias--variance tradeoff?
+\end{itemize}
+
+\textbf{(2) Calculation/Derivation:}
+\begin{itemize}
+  \item The entropy formula is $H(p) = -\sum_i p_i \log p_i$. Under what conditions is entropy minimized or maximized (for $k$ equally possible outcomes)?
+\end{itemize}
+
+\textbf{(3) Programming Practice:}
+\begin{itemize}
+  \item Write a Python function that accepts a list of strings, each containing a JSON object, and returns a \texttt{pandas.DataFrame} containing only the required fields, discarding everything else.
+\end{itemize}
+
+\noindent\rule{\textwidth}{0.4pt}
+\newpage
+
+%----------------------------------------
+\section*{Exam Ticket 8}
+\textbf{(1) Theory:}
+\begin{itemize}
+  \item Gradient-boosted trees: what is the idea behind the ``gradient'' step? How are trees built iteratively to approximate the negative gradient of the loss function?
+\end{itemize}
+
+\textbf{(2) Calculation/Derivation:}
+\begin{itemize}
+  \item The general form of logloss is:
+    \[
+      \text{logloss} = -\frac{1}{N}\sum_{i=1}^N \Bigl[ y_i \log(\hat{y}_i) + (1-y_i)\log(1-\hat{y}_i) \Bigr].
+    \]
+    Show how minimizing logloss yields an estimate of the Bernoulli parameter equal to the observed average frequency of success.
+\end{itemize}
+
+\textbf{(3) Programming Practice:}
+\begin{itemize}
+  \item Train a gradient boosting model, such as \texttt{XGBClassifier} or \texttt{LightGBM}, on real data. Tune the main hyperparameters (\texttt{learning\_rate}, \texttt{n\_estimators}, etc.) and evaluate performance using ROC AUC.
+\end{itemize}
+
+\noindent\rule{\textwidth}{0.4pt}
+\newpage
+
+%----------------------------------------
+\section*{Exam Ticket 9}
+\textbf{(1) Theory:}
+\begin{itemize}
+  \item SVD (singular value decomposition): the main idea, its relationship to matrix factorization, and applications in recommender systems, image compression, etc.
+\end{itemize}
+
+\textbf{(2) Calculation/Derivation:}
+\begin{itemize}
+  \item Write the expression for $\mathbf{A} = \mathbf{U}\mathbf{S}\mathbf{V}^\top$. Explain what a rank-1 matrix is and how it can be expressed in terms of the columns of $\mathbf{U}$ and $\mathbf{V}$ and the diagonal entries of $\mathbf{S}$.
+\end{itemize}
+
+\textbf{(3) Programming Practice:}
+\begin{itemize}
+  \item Generate a random matrix, for example with \texttt{np.random.randn(10, 5)}, perform SVD using \texttt{np.linalg.svd}, and store \texttt{U, S, Vt}. Verify that \texttt{U @ np.diag(S) @ Vt} matches the original matrix within numerical precision.
+\end{itemize}
+
+\noindent\rule{\textwidth}{0.4pt}
+\newpage
+
+%----------------------------------------
+\section*{Exam Ticket 10}
+\textbf{(1) Theory:}
+\begin{itemize}
+  \item Confidence intervals and hypothesis testing: what are the confidence level, statistical power, null hypothesis, and statistical significance?
+\end{itemize}
+
+\textbf{(2) Calculation/Derivation:}
+\begin{itemize}
+  \item A conditional probability problem about taxis: in a city, 15\,\% of taxis are ``Blue'' and 85\,\% are ``Green''. At night, a witness identifies the color correctly with probability 80\,\%. The witness says the taxi was ``Blue''. What is the probability that the taxi was actually ``Blue''?
+\end{itemize}
+
+\textbf{(3) Programming Practice:}
+\begin{itemize}
+  \item Generate samples from normal distributions with different means and sample sizes. Construct a confidence interval for the mean of each sample using, for example, \texttt{statsmodels} or \texttt{scipy.stats}, and compare the results across sample sizes.
+\end{itemize}
+
+\noindent\rule{\textwidth}{0.4pt}
+\newpage
+
+%----------------------------------------
+\section*{Exam Ticket 11}
+\textbf{(1) Theory:}
+\begin{itemize}
+  \item Embeddings: what are they and why are they useful? Example: word2vec --- how does it generalize the idea of representing words as vectors?
+\end{itemize}
+
+\textbf{(2) Calculation/Derivation:}
+\begin{itemize}
+  \item A conditional probability problem about a virus: the XYZ virus affects 1 in 1000 people. A test has a 5\,\% false positive rate. A person tests positive. What is the probability that the person is actually infected?
+\end{itemize}
+
+\textbf{(3) Programming Practice:}
+\begin{itemize}
+  \item Implement a simple trainable embedding matrix in NumPy or PyTorch/TensorFlow for a set of unique words. Demonstrate how it works using a toy example.
+\end{itemize}
+
+\noindent\rule{\textwidth}{0.4pt}
+\newpage
+
+%----------------------------------------
+\section*{Exam Ticket 12}
+\textbf{(1) Theory:}
+\begin{itemize}
+  \item The Bayesian approach versus the classical (frequentist) approach: estimation of Gaussian and Bernoulli parameters, and differences in the interpretation of confidence intervals. Bayes' theorem.
+\end{itemize}
+
+\textbf{(2) Calculation/Derivation:}
+\begin{itemize}
+  \item Derive Bayes' theorem from the definition of conditional probability and explain its main components: the prior, likelihood, and normalization constant.
+\end{itemize}
+
+\textbf{(3) Programming Practice:}
+\begin{itemize}
+  \item Implement a naive Bayes classifier (BernoulliNB) for binary classification using NumPy or scikit-learn. Compare it with \texttt{sklearn.naive\_bayes.BernoulliNB}.
+\end{itemize}
+
+\noindent\rule{\textwidth}{0.4pt}
+\newpage
+
+%----------------------------------------
+\section*{Exam Ticket 13}
+\textbf{(1) Theory:}
+\begin{itemize}
+  \item The naive Bayes classifier and conjugate distributions for the Gaussian and Bernoulli cases. Why is conjugacy useful in Bayesian models?
+\end{itemize}
+
+\textbf{(2) Calculation/Derivation:}
+\begin{itemize}
+  \item Derive the derivative (gradient) of the sigmoid function $\sigma(x) = \frac{1}{1 + e^{-x}}$.
+\end{itemize}
+
+\textbf{(3) Programming Practice:}
+\begin{itemize}
+  \item Implement backpropagation for logistic regression in NumPy: derive the gradient with respect to the weights $\mathbf{w}$ using the logloss function.
+\end{itemize}
+
+\noindent\rule{\textwidth}{0.4pt}
+\newpage
+
+%----------------------------------------
+\section*{Exam Ticket 14}
+\textbf{(1) Theory:}
+\begin{itemize}
+  \item An overview of methods: KNN, naive Bayes, linear models, SVM, decision trees, and ensembles (bagging, boosting, stacking). How are they related to neural networks, and how do they differ?
+\end{itemize}
+
+\textbf{(2) Calculation/Derivation:}
+\begin{itemize}
+  \item Differentiate $\log(\det(\mathbf{A}))$ with respect to the matrix $\mathbf{A}$.
+\end{itemize}
+
+\textbf{(3) Programming Practice:}
+\begin{itemize}
+  \item Write code to generate a synthetic two-dimensional dataset with two classes. Train \texttt{sklearn.svm.SVC} and visualize its decision boundary together with the original data points.
+\end{itemize}
+
+\noindent\rule{\textwidth}{0.4pt}
+\newpage
+
+%----------------------------------------
+\section*{Exam Ticket 15}
+\textbf{(1) Theory:}
+\begin{itemize}
+  \item Neural networks: what are backpropagation and matrix differentiation? Different activation functions (sigmoid, tanh, ReLU, etc.) and their properties (monotonicity, saturation, differentiability).
+\end{itemize}
+
+\textbf{(2) Calculation/Derivation:}
+\begin{itemize}
+  \item Find the derivative of $\tanh(x)$ with respect to its argument. How does $\tanh(x)$ differ from $\sigma(x)$ in terms of its range?
+\end{itemize}
+
+\textbf{(3) Programming Practice:}
+\begin{itemize}
+  \item Implement a single-layer perceptron in NumPy, including forward and backward passes. Use a small synthetic dataset to verify that the training error decreases.
+\end{itemize}
+
+\noindent\rule{\textwidth}{0.4pt}
+\newpage
+
+%----------------------------------------
+\section*{Exam Ticket 16}
+\textbf{(1) Theory:}
+\begin{itemize}
+  \item RNNs: their architecture, constituent matrices and vectors, state updates at each step, and the idea of training an RNN using backpropagation through time.
+\end{itemize}
+
+\textbf{(2) Calculation/Derivation:}
+\begin{itemize}
+  \item The derivative of the RNN loss function with respect to the logits at each step. Describe the main steps of backpropagation through time: how does the gradient propagate across time steps?
+\end{itemize}
+
+\textbf{(3) Programming Practice:}
+\begin{itemize}
+  \item Implement a simplified RNN for next-character prediction (character-level generation). Generate a small training set, train the model, and try generating text.
+\end{itemize}
+
+\noindent\rule{\textwidth}{0.4pt}
+\newpage
+
+%----------------------------------------
+\section*{Exam Ticket 17}
+\textbf{(1) Theory:}
+\begin{itemize}
+  \item LSTM: how does it differ from a classic RNN? The idea of ``long short-term memory'' (gates) and its advantages over a standard RNN. Briefly mention the universal approximation theorem.
+\end{itemize}
+
+\textbf{(2) Calculation/Derivation:}
+\begin{itemize}
+  \item How is Adagrad implemented in NumPy? What role does exponential smoothing play in optimizers such as RMSProp and Adam? Give the formula for an exponential moving average.
+\end{itemize}
+
+\textbf{(3) Programming Practice:}
+\begin{itemize}
+  \item Implement RNN text generation in Python with a ``temperature'' parameter. Explain how temperature affects the ``creativity'' of the generated text.
+\end{itemize}
+
+\noindent\rule{\textwidth}{0.4pt}
+
+\end{document}
