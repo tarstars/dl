@@ -21,7 +21,7 @@ fn main() -> Result<()> {
     let n_loaded = names.len();
     let rare = data::rare_chars(&names, MIN_CHAR_COUNT);
     let names = data::drop_names_with(names, &rare);
-    let alphabet = data::build_alphabet(&names);
+    let (alphabet, _char2ind) = data::build_alphabet(&names);
     let (train, val) = data::split_train_val(names, VAL_FRACTION, &mut rng);
 
     println!(
@@ -37,6 +37,8 @@ fn main() -> Result<()> {
 
     let rnn = Rnn::new(alphabet.len(), HIDDEN_SIZE, &mut rng);
     println!("parameters: {}", rnn.n_params());
+
+
 
     Ok(())
 }

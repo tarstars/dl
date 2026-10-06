@@ -72,11 +72,14 @@ pub fn drop_names_with(names: Vec<String>, banned: &HashSet<char>) -> Vec<String
 }
 
 /// The sorted characters used in `names`, preceded by `START` and `END`.
-pub fn build_alphabet(names: &[String]) -> Vec<char> {
+pub fn build_alphabet(names: &[String]) -> (Vec<char>,HashMap<char,usize>) {
     let letters: HashSet<char> = names.iter().flat_map(|name| name.chars()).collect();
     let mut letters: Vec<char> = letters.into_iter().collect();
     letters.sort();
-    [vec![START, END], letters].concat()
+    let alphabet = [vec![START, END], letters].concat();
+    let char2ind = HashMap::<char, usize>::from_iter(alphabet.iter().enumerate().map(|x| (*x.1, x.0)));
+
+    (alphabet, char2ind)
 }
 
 /// Shuffles `names` and splits off `val_fraction` of them as the validation set.
