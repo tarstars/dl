@@ -1,13 +1,9 @@
-mod data;
-mod model;
-
-use model::Rnn;
+use rnn_training::model::Rnn;
+use rnn_training::{Result, data};
 use rand::SeedableRng;
 use rand::rngs::StdRng;
 use rand::seq::SliceRandom;
 use std::collections::HashMap;
-
-type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 
 const DATA_DIR: &str = "/home/tarstars/database/shad/generate_text/ru";
 const SEED: u64 = 42;

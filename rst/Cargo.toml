@@ -2,6 +2,7 @@
 name = "rnn-training"
 version = "0.1.0"
 edition = "2024"
+default-run = "rnn-training"
 
 [dependencies]
 ndarray = "0.17.2"

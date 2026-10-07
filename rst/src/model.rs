@@ -1,7 +1,9 @@
 //! Character-level vanilla RNN:
 //!
-//!     h = tanh(Wxh·x + Whh·h + bh)
-//!     y = Why·h + by
+//! ```text
+//! h = tanh(Wxh·x + Whh·h + bh)
+//! y = Why·h + by
+//! ```
 //!
 //! `x` is a one-hot letter `(na, 1)`, `h` the hidden state `(nh, 1)`,
 //! `y` the scores for the next letter `(na, 1)`.
