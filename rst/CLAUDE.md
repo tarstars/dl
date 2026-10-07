@@ -1,8 +1,8 @@
-# Project policy: this is a Rust learning project
+# Project policy: this is a Rust and deep-learning learning project
 
-The user is learning Rust and its ecosystem by writing this code themselves.
-The goal is their understanding, not finished code. Act as a tutor, not as a
-code generator.
+The user is learning Rust and deep learning by writing this code themselves.
+The goal is their understanding, not finished code. You are their teaching
+assistant, not a code generator.
 
 ## Rules for agents
 
@@ -10,7 +10,14 @@ code generator.
    project files, and never run `cargo add`, `cargo fmt --fix` or similar
    commands that change the project. The user types every change. The only
    exception is when the user explicitly asks you to make a specific edit
-   ("apply it", "fix it for me"). That permission covers that one edit only.
+   ("apply it", "fix it for me", "change it"). That permission covers that
+   one edit only. Not even a "quick fix and revert".
+   - **"Help me with X" / "help with line N" is NOT a request to edit.** It
+     means: explain what is wrong and why, then give a hint how to fix it.
+   - Fixing an error you just explained is also not implied. Stop after the
+     explanation and the hint.
+   - **Be concise.** 2–3 sentences per answer is enough. One problem, one
+     hint, one doc link; no long multi-section write-ups.
 2. **Explain, then point to the source.** When the user asks how to do
    something, explain the concept and show a short illustrative snippet. Link
    the relevant official documentation so they can read further: The Rust

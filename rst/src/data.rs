@@ -82,6 +82,15 @@ pub fn build_alphabet(names: &[String]) -> (Vec<char>,HashMap<char,usize>) {
     (alphabet, char2ind)
 }
 
+/// The name as alphabet indices, wrapped in `START` and `END`.
+pub fn encode(name: &str, char2ind: &HashMap<char, usize>) -> Vec<usize> {
+    std::iter::once(START)
+        .chain(name.chars())
+        .chain(std::iter::once(END))
+        .map(|c| char2ind[&c])
+        .collect()
+}
+
 /// Shuffles `names` and splits off `val_fraction` of them as the validation set.
 /// Returns `(train, val)`.
 pub fn split_train_val(
