@@ -49,6 +49,11 @@ fn draw(p: &Array2<f32>, rng: &mut StdRng) -> usize {
     p.len() - 1
 }
 
+/// Euclidean norm of all gradient elements taken together.
+pub fn grad_norm(grads: &[&Array2<f32>]) -> f32 {
+    grads.iter().map(|g| g.iter().map(|v| v * v).sum::<f32>()).sum::<f32>().sqrt()
+}
+
 /// What one forward step leaves behind for backprop.
 struct Step {
     h_prev: Array2<f32>,
@@ -84,14 +89,18 @@ impl Rnn {
 
 
 
-    /// Plain SGD: `w -= lr * g` for each parameter, with every gradient
-    /// element clipped to ±`clip` against exploding gradients.
-    /// `grads` go in the order `wxh, whh, why, bh, by`.
-    pub fn sgd_update(&mut self, lr: f32, clip: f32, grads: [&Array2<f32>; 5]) {
+    /// SGD step `w -= lr * g` with global-norm clipping: if the norm of all
+    /// gradients together exceeds `clip`, they are all scaled down so that
+    /// their norm is `clip`. `grads` go in the order `wxh, whh, why, bh, by`.
+    /// Returns the gradient norm before clipping.
+    pub fn sgd_update(&mut self, lr: f32, clip: f32, grads: [&Array2<f32>; 5]) -> f32 {
+        let norm = grad_norm(&grads);
+        let scale = if norm > clip { clip / norm } else { 1.0 };
         let params = [&mut self.wxh, &mut self.whh, &mut self.why, &mut self.bh, &mut self.by];
         for (w, g) in params.into_iter().zip(grads) {
-            w.scaled_add(-lr, &g.mapv(|v| v.clamp(-clip, clip)));
+            w.scaled_add(-lr * scale, g);
         }
+        norm
     }
 
     /// One step: the next hidden state and the next-letter probabilities
@@ -266,5 +275,82 @@ mod tests {
         let rnn = tiny();
         let mut rng = StdRng::seed_from_u64(1);
         assert_eq!(rnn.sample(START, END, &[2, 3, 4], 3, 1.0, &mut rng), vec![2, 3, 4]);
+    }
+
+    /// The parameter matrices in the order `train_step` returns their gradients.
+    fn param_mut(rnn: &mut Rnn, k: usize) -> &mut Array2<f32> {
+        match k {
+            0 => &mut rnn.wxh,
+            1 => &mut rnn.whh,
+            2 => &mut rnn.why,
+            3 => &mut rnn.bh,
+            _ => &mut rnn.by,
+        }
+    }
+
+    /// Backprop check: every analytic gradient from `train_step` matches the
+    /// central difference (L(w + eps) - L(w - eps)) / 2eps of the loss.
+    #[test]
+    fn gradients_match_finite_differences() {
+        let mut rnn = tiny();
+        let seq = [START, 2, 3, 4, 2, END];
+        let (_, dwxh, dwhh, dwhy, dbh, dby, _) = rnn.train_step(&seq);
+        let grads = [dwxh, dwhh, dwhy, dbh, dby];
+        let eps = 1e-2;
+        for (k, grad) in grads.iter().enumerate() {
+            for ((r, c), &analytic) in grad.indexed_iter() {
+                let w = param_mut(&mut rnn, k)[[r, c]];
+                param_mut(&mut rnn, k)[[r, c]] = w + eps;
+                let plus = rnn.forward_sequence(&seq).1;
+                param_mut(&mut rnn, k)[[r, c]] = w - eps;
+                let minus = rnn.forward_sequence(&seq).1;
+                param_mut(&mut rnn, k)[[r, c]] = w;
+                let numeric = (plus - minus) / (2.0 * eps);
+                let tol = 2e-3 + 1e-2 * analytic.abs();
+                assert!(
+                    (numeric - analytic).abs() < tol,
+                    "param {k} [{r},{c}]: analytic {analytic}, numeric {numeric}"
+                );
+            }
+        }
+    }
+
+    fn ones_like(rnn: &Rnn) -> [Array2<f32>; 5] {
+        [&rnn.wxh, &rnn.whh, &rnn.why, &rnn.bh, &rnn.by].map(|m| Array2::ones(m.raw_dim()))
+    }
+
+    /// What `sgd_update` subtracted from each parameter.
+    fn deltas(before: &Rnn, after: &Rnn) -> [Array2<f32>; 5] {
+        [
+            &before.wxh - &after.wxh,
+            &before.whh - &after.whh,
+            &before.why - &after.why,
+            &before.bh - &after.bh,
+            &before.by - &after.by,
+        ]
+    }
+
+    #[test]
+    fn clipping_scales_large_gradients_to_clip_norm() {
+        let before = tiny();
+        let mut after = before.clone();
+        let g = ones_like(&before);
+        let n_params = before.n_params() as f32;
+        let norm = after.sgd_update(1.0, 1.0, [&g[0], &g[1], &g[2], &g[3], &g[4]]);
+        assert!((norm - n_params.sqrt()).abs() < 1e-4, "returned norm {norm}");
+        let d = deltas(&before, &after);
+        let step = grad_norm(&[&d[0], &d[1], &d[2], &d[3], &d[4]]);
+        assert!((step - 1.0).abs() < 1e-4, "step norm {step}");
+    }
+
+    #[test]
+    fn clipping_leaves_small_gradients_unchanged() {
+        let before = tiny();
+        let mut after = before.clone();
+        let g = ones_like(&before);
+        after.sgd_update(0.1, 100.0, [&g[0], &g[1], &g[2], &g[3], &g[4]]);
+        for d in deltas(&before, &after) {
+            assert!(d.iter().all(|&v| (v - 0.1).abs() < 1e-6));
+        }
     }
 }

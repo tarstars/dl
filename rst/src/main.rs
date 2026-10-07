@@ -12,8 +12,8 @@ const MIN_CHAR_COUNT: usize = 10;
 const VAL_FRACTION: f64 = 0.1;
 const HIDDEN_SIZE: usize = 200;
 const LEARNING_RATE: f32 = 0.003;
-/// Each gradient element is clipped to ±this before the update.
-const GRAD_CLIP: f32 = 5.0;
+/// The norm of all gradients together is clipped to this before the update.
+const GRAD_CLIP: f32 = 50.0;
 const EPOCHS: usize = 5;
 /// Print the running train loss every this many names.
 const LOG_EVERY: usize = 10_000;
