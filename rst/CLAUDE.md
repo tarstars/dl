@@ -44,11 +44,15 @@ assistant, not a code generator.
 - Data: `/home/tarstars/database/shad/generate_text/ru/place-{village,town,hamlet,city}.ndjson`,
   one OpenStreetMap place record per line as JSON; some records have no
   `name` field. All 4 files give 77,411 unique names.
-- Layout: `src/main.rs` is a flat pipeline (load → drop rare chars → alphabet
-  → seeded shuffle/split → `Rnn::new`) with constants at the top;
-  `src/data.rs` holds the dataset steps, `src/model.rs` the `Rnn` struct.
-  One `StdRng` (seed 42) drives all randomness.
+- Layout: library crate `src/lib.rs` (`data`, `model`, `lab`) and two
+  binaries. `src/main.rs` is the CLI trainer, a flat pipeline (load → drop
+  rare chars → alphabet → seeded shuffle/split → train) with constants at
+  the top. `src/bin/server.rs` + `static/index.html` is the RNN Lab web app
+  (`cargo run --release --bin server`, http://127.0.0.1:3000);
+  `src/lab.rs` holds its HTTP-free training-run logic. `src/model.rs` has
+  the `Rnn` with hand-written backprop and unit tests, including a
+  numerical gradient check. Design: `docs/superpowers/specs/2026-10-07-rnn-lab-design.md`.
 - Dependencies: `serde`, `serde_json`, `ndarray`, `rand` 0.10 (note:
-  `random_range` comes from the `RngExt` trait in this version).
+  `random_range` comes from the `RngExt` trait in this version), `axum` 0.8 and `tokio` (web lab only).
 - Planned approach: first a hand-written RNN with `ndarray` and manual
   backprop (for understanding), possibly `burn` later for autograd.

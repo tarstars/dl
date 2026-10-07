@@ -1,0 +1,429 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RNN Lab</title>
+<link rel="icon" href="data:,">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #f6f6f3; --card: #fff; --ink: #1d1d1b; --muted: #6b6b66; --line: #e2e2dc;
+    --accent: #2f6fdf; --bad: #c8372d;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink);
+         font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  header { padding: 14px 20px; border-bottom: 1px solid var(--line); background: var(--card);
+           display: flex; gap: 16px; align-items: baseline; flex-wrap: wrap; }
+  header h1 { margin: 0; font-size: 18px; }
+  header .info { color: var(--muted); }
+  main { display: grid; grid-template-columns: 320px 1fr; gap: 16px; padding: 16px 20px; }
+  @media (max-width: 900px) { main { grid-template-columns: 1fr; } }
+  section { background: var(--card); border: 1px solid var(--line); border-radius: 8px;
+            padding: 14px; margin-bottom: 16px; }
+  h2 { font-size: 14px; margin: 0 0 10px; }
+  .hint { color: var(--muted); font-size: 12.5px; margin: 8px 0 0; }
+  label { display: grid; grid-template-columns: 1fr 110px; align-items: center; gap: 8px; margin: 6px 0; }
+  input[type=number], input[type=text] { width: 100%; padding: 5px 7px; border: 1px solid var(--line);
+            border-radius: 5px; font: inherit; }
+  button { font: inherit; padding: 6px 12px; border-radius: 5px; border: 1px solid var(--accent);
+           background: var(--accent); color: #fff; cursor: pointer; }
+  button.secondary { background: #fff; color: var(--accent); }
+  button.stop { background: #fff; color: var(--bad); border-color: var(--bad); padding: 2px 8px; }
+  button:disabled { opacity: .5; cursor: default; }
+  #error { color: var(--bad); margin: 0 0 8px; white-space: pre-wrap; }
+  .run { border: 1px solid var(--line); border-radius: 6px; padding: 8px; margin: 6px 0; cursor: pointer; }
+  .run.selected { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+  .run .top { display: flex; align-items: center; gap: 6px; }
+  .swatch { width: 12px; height: 12px; border-radius: 3px; flex: none; }
+  .status { margin-left: auto; font-size: 12px; color: var(--muted); }
+  .run .losses, .run .params { font-size: 12.5px; color: var(--muted); }
+  .run .samples { font-style: italic; font-size: 13px; margin-top: 2px; }
+  .charts { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 1200px) { .charts { grid-template-columns: 1fr; } }
+  .chart-box { position: relative; height: 300px; }
+  .probe { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  @media (max-width: 1200px) { .probe { grid-template-columns: 1fr; } }
+  .row { display: flex; gap: 8px; align-items: center; margin: 6px 0; flex-wrap: wrap; }
+  .row input[type=text] { flex: 1; min-width: 120px; }
+  #names { columns: 2; margin: 8px 0 0; padding-left: 20px; }
+  .bar { display: grid; grid-template-columns: 70px 1fr 56px; align-items: center; gap: 8px; margin: 3px 0; }
+  .bar .ch { font-family: ui-monospace, monospace; }
+  .bar .track { background: #eef0f6; border-radius: 3px; height: 14px; }
+  .bar .fill { background: var(--accent); height: 100%; border-radius: 3px; }
+  .bar .pct { text-align: right; font-variant-numeric: tabular-nums; color: var(--muted); }
+</style>
+</head>
+<body>
+<header>
+  <h1>RNN Lab</h1>
+  <span class="info" id="info">loading…</span>
+</header>
+
+<main>
+  <div>
+    <section>
+      <h2>Train a new run</h2>
+      <form id="params">
+        <label>Hidden size <input type="number" name="hidden" min="1" max="1000" step="1"></label>
+        <label>Learning rate <input type="number" name="lr" min="0" step="any"></label>
+        <label>Gradient clip (norm) <input type="number" name="clip" min="0" step="any"></label>
+        <label>Epochs <input type="number" name="epochs" min="1" max="100" step="1"></label>
+        <label>Point every N names <input type="number" name="log_every" min="1" step="1"></label>
+        <button type="submit" id="start">Start training</button>
+      </form>
+      <p class="hint">One run trains at a time. Each run keeps its curves, so you can
+        compare, e.g., lr 0.01 against 0.003.</p>
+    </section>
+    <section>
+      <h2>Runs</h2>
+      <p id="error" hidden></p>
+      <div id="runs"><p class="hint">No runs yet.</p></div>
+    </section>
+  </div>
+
+  <div>
+    <div class="charts">
+      <section>
+        <h2>Loss per character (nats)</h2>
+        <div class="chart-box"><canvas id="loss"></canvas></div>
+        <p class="hint">Mean −ln p(correct next letter). Solid: train, dashed: validation.
+          The grey line is a uniform guess, ln(alphabet size). Validation rising while
+          train falls means overfitting.</p>
+      </section>
+      <section>
+        <h2>Gradient norm — <span id="grad-run">no run selected</span></h2>
+        <div class="chart-box"><canvas id="grad"></canvas></div>
+        <p class="hint">Norm of all gradients together, before clipping (log scale).
+          Above the red line the step is scaled down to the clip norm; the orange curve
+          (right axis) is the share of steps that were clipped. Spikes are exploding
+          gradients — try a large learning rate to see them.</p>
+      </section>
+    </div>
+
+    <section>
+      <h2>Probe the model — <span id="probe-run">no run selected</span></h2>
+      <div class="probe">
+        <div>
+          <div class="row">
+            <input type="text" id="prefix" placeholder="Beginning of a name, e.g. Ново" autocomplete="off">
+            <button id="generate">Generate</button>
+          </div>
+          <div class="row">
+            Temperature
+            <input type="range" id="temperature" min="0.1" max="3" step="0.05" value="1">
+            <span id="temperature-value">1.00</span>
+          </div>
+          <p class="hint">Sampling uses softmax(y / T). T &lt; 1 sharpens the distribution
+            toward the likeliest letter (safe, repetitive names); T &gt; 1 flattens it
+            toward uniform (wild names).</p>
+          <ol id="names"></ol>
+        </div>
+        <div>
+          <div><strong>Next letter after “<span id="probs-prefix"></span>”</strong></div>
+          <div id="probs"></div>
+          <p class="hint">The model's top 10 candidates for the next letter at this
+            temperature. “⏎ end” is the probability that the name ends here. While a run
+            trains, these update with every new point.</p>
+        </div>
+      </div>
+    </section>
+  </div>
+</main>
+
+<script>
+const COLORS = ["#2f6fdf", "#d9622b", "#2a9d6f", "#9b4dca", "#c8372d", "#8a6d1f", "#1b8ea6", "#d14d8c"];
+const color = id => COLORS[id % COLORS.length];
+const $ = id => document.getElementById(id);
+
+let info = null;
+let runs = [];
+let selected = null;        // id of the run shown in the gradient chart and the probe panel
+let seenPoints = -1;        // point count of the selected run when probs were last fetched
+let probsRequest = 0;       // ignores probs responses that arrive out of order
+
+async function api(path, options) {
+  const response = await fetch(path, options);
+  if (!response.ok) throw new Error((await response.text()) || response.statusText);
+  return response.status === 204 ? null : response.json();
+}
+
+function showError(e) {
+  $("error").textContent = e ? e.message : "";
+  $("error").hidden = !e;
+}
+
+function showChar(c) {
+  if (c === ">") return "⏎ end";
+  if (c === " ") return "␣ space";
+  return c;
+}
+
+// ---------- charts ----------
+
+const lossChart = new Chart($("loss"), {
+  type: "line",
+  data: { datasets: [] },
+  options: {
+    animation: false, maintainAspectRatio: false, parsing: false,
+    interaction: { mode: "nearest", intersect: false },
+    elements: { point: { radius: 0 } },
+    scales: {
+      x: { type: "linear", title: { display: true, text: "names seen" } },
+      y: { title: { display: true, text: "nats per char" } },
+    },
+    plugins: { legend: { labels: { boxWidth: 12 } } },
+  },
+});
+
+const gradChart = new Chart($("grad"), {
+  type: "line",
+  data: { datasets: [] },
+  options: {
+    animation: false, maintainAspectRatio: false, parsing: false,
+    interaction: { mode: "nearest", intersect: false },
+    elements: { point: { radius: 0 } },
+    scales: {
+      x: { type: "linear", title: { display: true, text: "names seen" } },
+      y: { type: "logarithmic", title: { display: true, text: "gradient norm" } },
+      y1: { position: "right", min: 0, max: 1, grid: { drawOnChartArea: false },
+            title: { display: true, text: "share clipped" } },
+    },
+    plugins: { legend: { labels: { boxWidth: 12 } } },
+  },
+});
+
+function renderCharts() {
+  const datasets = [];
+  let maxX = 1;
+  for (const run of runs) {
+    const c = color(run.id);
+    datasets.push({ label: `#${run.id} train`, borderColor: c, backgroundColor: c, borderWidth: 2,
+      data: run.points.map(p => ({ x: p.names_seen, y: p.train_loss })) });
+    datasets.push({ label: `#${run.id} val`, borderColor: c, backgroundColor: c, borderWidth: 2,
+      borderDash: [6, 4], data: run.points.map(p => ({ x: p.names_seen, y: p.val_loss })) });
+    for (const p of run.points) maxX = Math.max(maxX, p.names_seen);
+  }
+  if (info) {
+    datasets.push({ label: "uniform guess", borderColor: "#aaa", borderWidth: 1, borderDash: [2, 3],
+      data: [{ x: 0, y: info.uniform_loss }, { x: maxX, y: info.uniform_loss }] });
+  }
+  lossChart.data.datasets = datasets;
+  lossChart.update();
+
+  const run = runs.find(r => r.id === selected);
+  $("grad-run").textContent = run ? `run #${run.id}` : "no run selected";
+  if (!run) { gradChart.data.datasets = []; gradChart.update(); return; }
+  const xs = run.points.map(p => p.names_seen);
+  const right = xs.length ? xs[xs.length - 1] : 1;
+  gradChart.data.datasets = [
+    { label: "mean", borderColor: color(run.id), borderWidth: 2,
+      data: run.points.map(p => ({ x: p.names_seen, y: p.grad_norm_mean })) },
+    { label: "max", borderColor: color(run.id), borderWidth: 1, borderDash: [3, 3],
+      data: run.points.map(p => ({ x: p.names_seen, y: p.grad_norm_max })) },
+    { label: `clip = ${run.params.clip}`, borderColor: "#c8372d", borderWidth: 1.5,
+      data: [{ x: 0, y: run.params.clip }, { x: right, y: run.params.clip }] },
+    { label: "share clipped", borderColor: "#e0a030", borderWidth: 1.5, yAxisID: "y1",
+      data: run.points.map(p => ({ x: p.names_seen, y: p.clipped_fraction })) },
+  ];
+  gradChart.update();
+}
+
+// ---------- runs list ----------
+
+function fmt(x) {
+  return x === null || x === undefined ? "–" : x.toFixed(3);
+}
+
+function renderRuns() {
+  const box = $("runs");
+  box.replaceChildren();
+  if (!runs.length) {
+    const p = document.createElement("p");
+    p.className = "hint";
+    p.textContent = "No runs yet.";
+    box.append(p);
+  }
+  for (const run of [...runs].reverse()) {
+    const last = run.points[run.points.length - 1];
+    const div = document.createElement("div");
+    div.className = "run" + (run.id === selected ? " selected" : "");
+    div.onclick = () => select(run.id);
+
+    const top = document.createElement("div");
+    top.className = "top";
+    const swatch = document.createElement("span");
+    swatch.className = "swatch";
+    swatch.style.background = color(run.id);
+    const title = document.createElement("strong");
+    title.textContent = `Run #${run.id}`;
+    const status = document.createElement("span");
+    status.className = "status";
+    status.textContent = run.status + (last ? ` · epoch ${last.epoch}/${run.params.epochs}` : "");
+    top.append(swatch, title, status);
+    if (run.status === "Running") {
+      const stop = document.createElement("button");
+      stop.className = "stop";
+      stop.textContent = "Stop";
+      stop.onclick = async e => {
+        e.stopPropagation();
+        try { await api(`/api/runs/${run.id}/stop`, { method: "POST" }); showError(null); }
+        catch (err) { showError(err); }
+      };
+      top.append(stop);
+    }
+
+    const params = document.createElement("div");
+    params.className = "params";
+    const p = run.params;
+    params.textContent = `hidden ${p.hidden} · lr ${p.lr} · clip ${p.clip} · every ${p.log_every}`;
+    const losses = document.createElement("div");
+    losses.className = "losses";
+    losses.textContent = last
+      ? `train ${fmt(last.train_loss)} · val ${fmt(last.val_loss)} · ${last.names_seen} names`
+      : "no points yet";
+    const samples = document.createElement("div");
+    samples.className = "samples";
+    samples.textContent = run.samples.join(", ");
+    div.append(top, params, losses, samples);
+    box.append(div);
+  }
+}
+
+// ---------- probe panel ----------
+
+function select(id) {
+  selected = id;
+  seenPoints = -1;
+  $("probe-run").textContent = `run #${id}`;
+  renderRuns();
+  renderCharts();
+  refreshProbs();
+}
+
+function probeQuery() {
+  const prefix = encodeURIComponent($("prefix").value);
+  return `prefix=${prefix}&temperature=${$("temperature").value}`;
+}
+
+async function refreshProbs() {
+  $("probs-prefix").textContent = $("prefix").value;
+  if (selected === null) return;
+  const request = ++probsRequest;
+  try {
+    const top = await api(`/api/runs/${selected}/probs?${probeQuery()}`);
+    if (request !== probsRequest) return;
+    showError(null);
+    const box = $("probs");
+    box.replaceChildren();
+    for (const [c, p] of top) {
+      const row = document.createElement("div");
+      row.className = "bar";
+      const ch = document.createElement("span");
+      ch.className = "ch";
+      ch.textContent = showChar(c);
+      const track = document.createElement("div");
+      track.className = "track";
+      const fill = document.createElement("div");
+      fill.className = "fill";
+      fill.style.width = `${(p * 100).toFixed(1)}%`;
+      track.append(fill);
+      const pct = document.createElement("span");
+      pct.className = "pct";
+      pct.textContent = `${(p * 100).toFixed(1)}%`;
+      row.append(ch, track, pct);
+      box.append(row);
+    }
+  } catch (e) {
+    if (request === probsRequest) showError(e);
+  }
+}
+
+async function generate() {
+  if (selected === null) return showError(new Error("Select a run first."));
+  try {
+    const names = await api(`/api/runs/${selected}/generate?${probeQuery()}&n=10`);
+    showError(null);
+    const list = $("names");
+    list.replaceChildren();
+    for (const name of names) {
+      const li = document.createElement("li");
+      li.textContent = name;
+      list.append(li);
+    }
+  } catch (e) {
+    showError(e);
+  }
+}
+
+// ---------- refresh loop ----------
+
+async function refresh() {
+  try {
+    runs = await api("/api/runs");
+  } catch (e) {
+    return showError(e);
+  }
+  if (selected === null && runs.length) return select(runs[runs.length - 1].id);
+  renderRuns();
+  renderCharts();
+  const run = runs.find(r => r.id === selected);
+  if (run && run.points.length !== seenPoints) {
+    seenPoints = run.points.length;
+    refreshProbs();
+  }
+  $("start").disabled = runs.some(r => r.status === "Running");
+}
+
+$("params").onsubmit = async e => {
+  e.preventDefault();
+  const form = new FormData(e.target);
+  const params = {
+    hidden: parseInt(form.get("hidden")),
+    lr: parseFloat(form.get("lr")),
+    clip: parseFloat(form.get("clip")),
+    epochs: parseInt(form.get("epochs")),
+    log_every: parseInt(form.get("log_every")),
+  };
+  try {
+    const { id } = await api("/api/runs", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(params),
+    });
+    showError(null);
+    selected = null;
+    await refresh();
+    select(id);
+  } catch (err) {
+    showError(err);
+  }
+};
+
+$("prefix").oninput = refreshProbs;
+$("prefix").onkeydown = e => { if (e.key === "Enter") generate(); };
+$("temperature").oninput = () => {
+  $("temperature-value").textContent = Number($("temperature").value).toFixed(2);
+  refreshProbs();
+};
+$("generate").onclick = generate;
+
+(async () => {
+  try {
+    info = await api("/api/info");
+    $("info").textContent = `${info.train_names} train / ${info.val_names} val names · ` +
+      `alphabet of ${info.alphabet.length} · uniform guess ${info.uniform_loss.toFixed(3)} nats`;
+    for (const [key, value] of Object.entries(info.defaults)) {
+      const input = document.querySelector(`#params [name=${key}]`);
+      if (input) input.value = value;
+    }
+  } catch (e) {
+    showError(e);
+  }
+  await refresh();
+  setInterval(() => { if (runs.some(r => r.status === "Running")) refresh(); }, 500);
+})();
+</script>
+</body>
+</html>
