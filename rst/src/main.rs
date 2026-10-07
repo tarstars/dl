@@ -27,7 +27,7 @@ fn samples(rnn: &Rnn, alphabet: &[char], char2ind: &HashMap<char, usize>, rng: &
     let (start, end) = (char2ind[&data::START], char2ind[&data::END]);
     (0..N_SAMPLES)
         .map(|_| {
-            rnn.sample(start, end, MAX_SAMPLE_LEN, rng)
+            rnn.sample(start, end, &[], MAX_SAMPLE_LEN, 1.0, rng)
                 .iter()
                 .map(|&i| alphabet[i])
                 .collect::<String>()

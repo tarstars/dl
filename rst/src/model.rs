@@ -12,6 +12,7 @@ use ndarray::{Array2, s};
 use rand::RngExt;
 use rand::rngs::StdRng;
 
+#[derive(Clone)]
 pub struct Rnn {
     pub na: usize,
     pub nh: usize,
@@ -35,9 +36,10 @@ fn softmax(y: &Array2<f32>) -> Array2<f32> {
     e / sum
 }
 
-/// A random index drawn with probabilities `p`.
+/// A random index drawn with probabilities proportional to `p`
+/// (`p` need not sum to 1).
 fn draw(p: &Array2<f32>, rng: &mut StdRng) -> usize {
-    let mut u: f32 = rng.random();
+    let mut u: f32 = rng.random::<f32>() * p.sum();
     for (i, &pi) in p.iter().enumerate() {
         u -= pi;
         if u < 0.0 {
@@ -92,22 +94,54 @@ impl Rnn {
         }
     }
 
-    /// Generates a name: starts from `start`, feeds each drawn letter back
-    /// in, stops at `end` or after `max_len` letters. `start` and `end`
-    /// are not included in the result.
-    pub fn sample(&self, start: usize, end: usize, max_len: usize, rng: &mut StdRng) -> Vec<usize> {
-        let mut h = Array2::zeros((self.nh, 1));
-        let mut tc = start;
-        let mut name = Vec::new();
-        for _ in 0..max_len {
-            let h_raw = &self.whh.dot(&h) + &self.bh + self.wxh.slice(s![.., tc..tc+1]);
-            h = h_raw.mapv(f32::tanh);
-            let p = softmax(&(&self.why.dot(&h) + &self.by));
-            tc = draw(&p, rng);
+    /// One step: the next hidden state and the next-letter probabilities
+    /// `softmax(y / temperature)`. Temperature below 1 sharpens the
+    /// distribution, above 1 flattens it.
+    fn probs(&self, h: &Array2<f32>, tc: usize, temperature: f32) -> (Array2<f32>, Array2<f32>) {
+        let h_raw = &self.whh.dot(h) + &self.bh + self.wxh.slice(s![.., tc..tc + 1]);
+        let h_next = h_raw.mapv(f32::tanh);
+        let y = &self.why.dot(&h_next) + &self.by;
+        (h_next, softmax(&(y / temperature)))
+    }
+
+    /// Feeds `start` and then every letter of `prefix`. Returns the hidden
+    /// state and the next-letter probabilities after the last one.
+    fn read_prefix(&self, start: usize, prefix: &[usize], temperature: f32) -> (Array2<f32>, Array2<f32>) {
+        let (mut h, mut p) = self.probs(&Array2::zeros((self.nh, 1)), start, temperature);
+        for &tc in prefix {
+            (h, p) = self.probs(&h, tc, temperature);
+        }
+        (h, p)
+    }
+
+    /// The probability of each alphabet letter coming right after `prefix`.
+    pub fn next_probs(&self, start: usize, prefix: &[usize], temperature: f32) -> Vec<f32> {
+        self.read_prefix(start, prefix, temperature).1.iter().copied().collect()
+    }
+
+    /// Generates a name that begins with `prefix`: feeds `start` and the
+    /// prefix, then draws letters and feeds each one back in. Stops at `end`
+    /// or when the name has `max_len` letters. The result includes the
+    /// prefix and never contains `start` or `end`.
+    pub fn sample(
+        &self,
+        start: usize,
+        end: usize,
+        prefix: &[usize],
+        max_len: usize,
+        temperature: f32,
+        rng: &mut StdRng,
+    ) -> Vec<usize> {
+        let (mut h, mut p) = self.read_prefix(start, prefix, temperature);
+        let mut name = prefix.to_vec();
+        while name.len() < max_len {
+            p[[start, 0]] = 0.0;
+            let tc = draw(&p, rng);
             if tc == end {
                 break;
             }
             name.push(tc);
+            (h, p) = self.probs(&h, tc, temperature);
         }
         name
     }
@@ -177,5 +211,60 @@ impl Rnn {
         }
 
         (loss, dwxh, dwhh, dwhy, dbh, dby, h)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use rand::SeedableRng;
+
+    const START: usize = 0;
+    const END: usize = 1;
+
+    /// A small model: 5 letters, hidden state of 4.
+    fn tiny() -> Rnn {
+        Rnn::new(5, 4, &mut StdRng::seed_from_u64(7))
+    }
+
+    #[test]
+    fn next_probs_sum_to_one() {
+        let rnn = tiny();
+        for t in [0.5, 1.0, 2.0] {
+            for prefix in [&[][..], &[2, 3][..]] {
+                let sum: f32 = rnn.next_probs(START, prefix, t).iter().sum();
+                assert!((sum - 1.0).abs() < 1e-5, "sum {sum} at T={t}");
+            }
+        }
+    }
+
+    #[test]
+    fn low_temperature_concentrates_on_argmax() {
+        let mut rnn = tiny();
+        rnn.by[[3, 0]] = 10.0; // letter 3 has by far the highest score
+        let cold = rnn.next_probs(START, &[2], 0.05);
+        let warm = rnn.next_probs(START, &[2], 1.0);
+        assert!(cold[3] > 0.99, "cold p[3] = {}", cold[3]);
+        assert!(warm[3] < cold[3]);
+    }
+
+    #[test]
+    fn sample_keeps_prefix_and_skips_markers() {
+        let rnn = tiny();
+        let mut rng = StdRng::seed_from_u64(1);
+        let prefix = [2, 3];
+        for _ in 0..200 {
+            let name = rnn.sample(START, END, &prefix, 10, 1.0, &mut rng);
+            assert!(name.starts_with(&prefix));
+            assert!(name.len() <= 10);
+            assert!(!name.contains(&START) && !name.contains(&END), "{name:?}");
+        }
+    }
+
+    #[test]
+    fn sample_with_prefix_at_max_len_returns_prefix() {
+        let rnn = tiny();
+        let mut rng = StdRng::seed_from_u64(1);
+        assert_eq!(rnn.sample(START, END, &[2, 3, 4], 3, 1.0, &mut rng), vec![2, 3, 4]);
     }
 }
