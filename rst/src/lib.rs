@@ -3,6 +3,7 @@
 //! (`src/main.rs`) and the web server (`src/bin/server.rs`).
 
 pub mod data;
+pub mod lab;
 pub mod model;
 
 pub type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
