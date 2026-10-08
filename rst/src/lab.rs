@@ -87,6 +87,8 @@ impl Dataset {
 pub struct Params {
     pub hidden: usize,
     pub lr: f32,
+    /// Names per SGD step; the gradient is averaged over them.
+    pub batch: usize,
     pub clip: f32,
     pub epochs: usize,
     /// Record a point every this many training names.
@@ -95,7 +97,7 @@ pub struct Params {
 
 impl Default for Params {
     fn default() -> Self {
-        Params { hidden: 100, lr: 0.003, clip: 50.0, epochs: 5, log_every: 2000 }
+        Params { hidden: 100, lr: 0.05, batch: 32, clip: 50.0, epochs: 5, log_every: 2000 }
     }
 }
 
@@ -107,11 +109,14 @@ impl Params {
         if !(self.lr.is_finite() && self.lr > 0.0) {
             return Err(format!("lr must be a positive number, got {}", self.lr));
         }
+        if self.batch == 0 {
+            return Err("batch must be at least 1".to_string());
+        }
         if !(self.clip.is_finite() && self.clip > 0.0) {
             return Err(format!("clip must be a positive number, got {}", self.clip));
         }
-        if !(1..=100).contains(&self.epochs) {
-            return Err(format!("epochs must be 1..=100, got {}", self.epochs));
+        if self.epochs == 0 {
+            return Err("epochs must be at least 1".to_string());
         }
         if self.log_every == 0 {
             return Err("log_every must be at least 1".to_string());
@@ -140,9 +145,11 @@ pub struct Point {
     pub train_loss: f32,
     /// Mean loss per character on the first `VAL_SUBSET` validation names.
     pub val_loss: f32,
+    /// Mean and largest gradient norm (before clipping) over the SGD steps
+    /// in the interval. A step is one batch.
     pub grad_norm_mean: f32,
     pub grad_norm_max: f32,
-    /// Share of steps in the interval whose gradient norm exceeded `clip`.
+    /// Share of SGD steps in the interval whose gradient norm exceeded `clip`.
     pub clipped_fraction: f32,
 }
 
@@ -296,9 +303,11 @@ pub fn start_run(lab: &Arc<Mutex<Lab>>, params: Params) -> Result<usize, StartEr
     Ok(id)
 }
 
-/// Sums over the names since the last point.
+/// Sums since the last point.
 #[derive(Default)]
 struct Interval {
+    /// SGD steps, i.e. batches.
+    steps: usize,
     names: usize,
     chars: usize,
     loss_sum: f32,
@@ -321,32 +330,36 @@ fn train(
     let val = &data.val[..VAL_SUBSET.min(data.val.len())];
     let mut interval = Interval::default();
     let mut names_seen = 0;
+    // `names_seen / log_every` at the last point; a batch that raises it makes a point.
+    let mut published_at = 0;
     let mut epoch = 1;
     let mut status = Status::Done;
 
     'epochs: while epoch <= params.epochs {
         train.shuffle(&mut rng);
-        for seq in &train {
+        for batch in train.chunks(params.batch) {
             if stop.load(Ordering::Relaxed) {
                 status = Status::Stopped;
                 break 'epochs;
             }
-            let (loss, dwxh, dwhh, dwhy, dbh, dby, _h) = rnn.train_step(seq);
-            let norm = rnn.sgd_update(params.lr, params.clip, [&dwxh, &dwhh, &dwhy, &dbh, &dby]);
-            interval.names += 1;
-            interval.chars += seq.len() - 1;
+            let (loss, grads) = rnn.train_batch(batch);
+            let norm = rnn.sgd_update(params.lr, params.clip, grads.each_ref());
+            interval.steps += 1;
+            interval.names += batch.len();
+            interval.chars += batch.iter().map(|seq| seq.len() - 1).sum::<usize>();
             interval.loss_sum += loss;
             interval.norm_sum += norm;
             interval.norm_max = interval.norm_max.max(norm);
             interval.clipped += (norm > params.clip) as usize;
-            names_seen += 1;
+            names_seen += batch.len();
             if !loss.is_finite() {
                 status = Status::Diverged;
                 break 'epochs;
             }
-            if names_seen % params.log_every == 0 {
+            if names_seen / params.log_every > published_at {
                 publish(lab, data, id, &rnn, val, names_seen, epoch, &interval, &mut rng);
                 interval = Interval::default();
+                published_at = names_seen / params.log_every;
             }
         }
         epoch += 1;
@@ -371,7 +384,7 @@ fn publish(
     interval: &Interval,
     rng: &mut StdRng,
 ) {
-    let n = interval.names as f32;
+    let n = interval.steps as f32;
     let point = Point {
         names_seen,
         epoch,
@@ -409,7 +422,7 @@ mod tests {
     }
 
     fn params(epochs: usize, log_every: usize) -> Params {
-        Params { hidden: 8, lr: 0.1, clip: 5.0, epochs, log_every }
+        Params { hidden: 8, lr: 0.1, batch: 1, clip: 5.0, epochs, log_every }
     }
 
     /// Waits until no run is training; panics after 10 s.
@@ -447,6 +460,20 @@ mod tests {
     }
 
     #[test]
+    fn batches_make_a_point_when_they_cross_a_log_every_multiple() {
+        let lab = toy_lab();
+        // 50 names in batches of 7 end at 7, 14, 21, 28, 35, 42, 49, 50.
+        let id = start_run(&lab, Params { batch: 7, ..params(1, 10) }).unwrap();
+        wait_idle(&lab);
+        let guard = lab.lock().unwrap();
+        let run = &guard.runs[id];
+        let seen: Vec<usize> = run.points.iter().map(|p| p.names_seen).collect();
+        assert_eq!(seen, vec![14, 21, 35, 42, 50]);
+        assert_eq!(run.status, Status::Done);
+        assert!(run.points.iter().all(|p| p.clipped_fraction <= 1.0));
+    }
+
+    #[test]
     fn second_run_while_training_is_refused_and_stop_works() {
         let lab = toy_lab();
         let id = start_run(&lab, params(100, 10)).unwrap();
@@ -466,6 +493,7 @@ mod tests {
             Params { lr: f32::NAN, ..params(1, 10) },
             Params { hidden: 0, ..params(1, 10) },
             Params { log_every: 0, ..params(1, 10) },
+            Params { batch: 0, ..params(1, 10) },
             Params { epochs: 0, ..params(1, 10) },
             Params { clip: -1.0, ..params(1, 10) },
         ] {

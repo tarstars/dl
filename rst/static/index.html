@@ -68,13 +68,15 @@
       <form id="params">
         <label>Hidden size <input type="number" name="hidden" min="1" max="1000" step="1"></label>
         <label>Learning rate <input type="number" name="lr" min="0" step="any"></label>
+        <label>Batch size <input type="number" name="batch" min="1" step="1"></label>
         <label>Gradient clip (norm) <input type="number" name="clip" min="0" step="any"></label>
-        <label>Epochs <input type="number" name="epochs" min="1" max="100" step="1"></label>
+        <label>Epochs <input type="number" name="epochs" min="1" step="1"></label>
         <label>Point every N names <input type="number" name="log_every" min="1" step="1"></label>
         <button type="submit" id="start">Start training</button>
       </form>
       <p class="hint">One run trains at a time. Each run keeps its curves, so you can
-        compare, e.g., lr 0.01 against 0.003.</p>
+        compare, e.g., lr 0.01 against 0.003, or batch 1 against 32. The gradient is
+        averaged over the batch, so a bigger batch usually wants a bigger learning rate.</p>
     </section>
     <section>
       <h2>Runs</h2>
@@ -277,7 +279,7 @@ function renderRuns() {
     const params = document.createElement("div");
     params.className = "params";
     const p = run.params;
-    params.textContent = `hidden ${p.hidden} · lr ${p.lr} · clip ${p.clip} · every ${p.log_every}`;
+    params.textContent = `hidden ${p.hidden} · lr ${p.lr} · batch ${p.batch} · clip ${p.clip} · every ${p.log_every}`;
     const losses = document.createElement("div");
     losses.className = "losses";
     losses.textContent = last
@@ -382,6 +384,7 @@ $("params").onsubmit = async e => {
   const params = {
     hidden: parseInt(form.get("hidden")),
     lr: parseFloat(form.get("lr")),
+    batch: parseInt(form.get("batch")),
     clip: parseFloat(form.get("clip")),
     epochs: parseInt(form.get("epochs")),
     log_every: parseInt(form.get("log_every")),

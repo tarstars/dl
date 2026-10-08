@@ -11,6 +11,7 @@
 use ndarray::{Array2, s};
 use rand::RngExt;
 use rand::rngs::StdRng;
+use rayon::prelude::*;
 
 #[derive(Clone)]
 pub struct Rnn {
@@ -221,6 +222,40 @@ impl Rnn {
 
         (loss, dwxh, dwhh, dwhy, dbh, dby, h)
     }
+
+    /// Forward and backward over every sequence in `seqs` (each wrapped in
+    /// START/END indices, as for `train_step`). Returns the summed loss and
+    /// the gradients averaged over the sequences, in the order
+    /// `wxh, whh, why, bh, by` that `sgd_update` expects. The sequences are
+    /// processed in parallel with rayon, so the floating-point summation
+    /// order, and hence the last bits of the result, can differ between runs.
+    ///
+    /// Panics if `seqs` is empty.
+    pub fn train_batch(&self, seqs: &[Vec<usize>]) -> (f32, [Array2<f32>; 5]) {
+        assert!(!seqs.is_empty(), "train_batch needs at least one sequence");
+        let zeros = || {
+            [&self.wxh, &self.whh, &self.why, &self.bh, &self.by].map(|w| Array2::<f32>::zeros(w.raw_dim()))
+        };
+        let add = |mut acc: (f32, [Array2<f32>; 5]), (loss, grads): (f32, [Array2<f32>; 5])| {
+            acc.0 += loss;
+            for (a, g) in acc.1.iter_mut().zip(&grads) {
+                *a += g;
+            }
+            acc
+        };
+        let (loss_sum, mut grads) = seqs
+            .par_iter()
+            .map(|seq| {
+                let (loss, dwxh, dwhh, dwhy, dbh, dby, _h) = self.train_step(seq);
+                (loss, [dwxh, dwhh, dwhy, dbh, dby])
+            })
+            .reduce(|| (0.0, zeros()), add);
+        let n = seqs.len() as f32;
+        for g in &mut grads {
+            *g /= n;
+        }
+        (loss_sum, grads)
+    }
 }
 
 #[cfg(test)]
@@ -313,6 +348,52 @@ mod tests {
                 );
             }
         }
+    }
+
+    fn assert_close(a: &Array2<f32>, b: &Array2<f32>, tol: f32) {
+        assert_eq!(a.raw_dim(), b.raw_dim());
+        for (x, y) in a.iter().zip(b.iter()) {
+            assert!((x - y).abs() < tol, "{x} vs {y}");
+        }
+    }
+
+    #[test]
+    fn train_batch_of_one_matches_train_step() {
+        let rnn = tiny();
+        let seq = vec![START, 2, 3, END];
+        let (loss, dwxh, dwhh, dwhy, dbh, dby, _) = rnn.train_step(&seq);
+        let (batch_loss, grads) = rnn.train_batch(&[seq]);
+        assert!((batch_loss - loss).abs() < 1e-6, "loss {batch_loss} vs {loss}");
+        for (g, single) in grads.iter().zip([&dwxh, &dwhh, &dwhy, &dbh, &dby]) {
+            assert_close(g, single, 1e-6);
+        }
+    }
+
+    #[test]
+    fn train_batch_sums_losses_and_averages_gradients() {
+        let rnn = tiny();
+        let a = vec![START, 2, 3, 4, END];
+        let b = vec![START, 4, 2, END];
+        let (la, dwxh_a, dwhh_a, dwhy_a, dbh_a, dby_a, _) = rnn.train_step(&a);
+        let (lb, dwxh_b, dwhh_b, dwhy_b, dbh_b, dby_b, _) = rnn.train_step(&b);
+        let (loss, grads) = rnn.train_batch(&[a, b]);
+        assert!((loss - (la + lb)).abs() < 1e-5, "loss {loss} vs {}", la + lb);
+        let expected = [
+            (&dwxh_a + &dwxh_b) / 2.0,
+            (&dwhh_a + &dwhh_b) / 2.0,
+            (&dwhy_a + &dwhy_b) / 2.0,
+            (&dbh_a + &dbh_b) / 2.0,
+            (&dby_a + &dby_b) / 2.0,
+        ];
+        for (g, e) in grads.iter().zip(expected.iter()) {
+            assert_close(g, e, 1e-6);
+        }
+    }
+
+    #[test]
+    #[should_panic(expected = "at least one sequence")]
+    fn train_batch_panics_on_empty() {
+        tiny().train_batch(&[]);
     }
 
     fn ones_like(rnn: &Rnn) -> [Array2<f32>; 5] {

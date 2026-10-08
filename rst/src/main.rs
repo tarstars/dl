@@ -11,7 +11,10 @@ const SEED: u64 = 42;
 const MIN_CHAR_COUNT: usize = 10;
 const VAL_FRACTION: f64 = 0.1;
 const HIDDEN_SIZE: usize = 200;
-const LEARNING_RATE: f32 = 0.003;
+/// Names per SGD step. The gradient is averaged over the batch, so a bigger
+/// batch wants a bigger learning rate than batch size 1 does.
+const BATCH_SIZE: usize = 32;
+const LEARNING_RATE: f32 = 0.05;
 /// The norm of all gradients together is clipped to this before the update.
 const GRAD_CLIP: f32 = 50.0;
 const EPOCHS: usize = 5;
@@ -59,6 +62,7 @@ fn main() -> Result<()> {
 
     let mut rnn = Rnn::new(alphabet.len(), HIDDEN_SIZE, &mut rng);
     println!("parameters: {}", rnn.n_params());
+    println!("batch size: {BATCH_SIZE}, learning rate: {LEARNING_RATE}, clip: {GRAD_CLIP}");
 
     let mut train: Vec<Vec<usize>> = train.iter().map(|n| data::encode(n, &char2ind)).collect();
     let val: Vec<Vec<usize>> = val.iter().map(|n| data::encode(n, &char2ind)).collect();
@@ -71,15 +75,18 @@ fn main() -> Result<()> {
         train.shuffle(&mut rng);
 
         let (mut loss_sum, mut n_chars) = (0.0, 0);
-        for (i, seq) in train.iter().enumerate() {
-            let (loss, dwxh, dwhh, dwhy, dbh, dby, _h) = rnn.train_step(seq);
-            rnn.sgd_update(LEARNING_RATE, GRAD_CLIP, [&dwxh, &dwhh, &dwhy, &dbh, &dby]);
+        let mut names_seen = 0;
+        for batch in train.chunks(BATCH_SIZE) {
+            let (loss, grads) = rnn.train_batch(batch);
+            rnn.sgd_update(LEARNING_RATE, GRAD_CLIP, grads.each_ref());
             loss_sum += loss;
-            n_chars += seq.len() - 1;
-            if (i + 1) % LOG_EVERY == 0 {
+            n_chars += batch.iter().map(|seq| seq.len() - 1).sum::<usize>();
+            // Log once this batch has carried `names_seen` past a multiple of LOG_EVERY.
+            let crossed = (names_seen + batch.len()) / LOG_EVERY > names_seen / LOG_EVERY;
+            names_seen += batch.len();
+            if crossed {
                 println!(
-                    "  epoch {epoch}, {:>6} names: train loss {:.3} | {}",
-                    i + 1,
+                    "  epoch {epoch}, {names_seen:>6} names: train loss {:.3} | {}",
                     loss_sum / n_chars as f32,
                     samples(&rnn, &alphabet, &char2ind, &mut rng)
                 );
